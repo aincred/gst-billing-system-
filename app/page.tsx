@@ -1419,7 +1419,6 @@
 //   );
 // }
 
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -1464,7 +1463,7 @@ const TRANSLATIONS = {
     qnty: "Qnty.",
     rate: "Rate",
     unitRate: "Unit Rate",
-    gst: "GST",
+    gst: "IGST",
     amount: "Amount",
     rupeesInWord: "Rupees In Word:",
     payId: "PAYID:-",
@@ -1493,7 +1492,7 @@ const TRANSLATIONS = {
     qnty: "मात्रा",
     rate: "दर",
     unitRate: "इकाई दर",
-    gst: "जीएसटी",
+    gst: "IGST",
     amount: "राशि (Amount)",
     rupeesInWord: "शब्दों में रुपये (Rupees In Word):",
     payId: "पे आईडी (PAYID):-",
@@ -1654,24 +1653,20 @@ export default function App() {
     let totalTaxAmount = 0;
 
     const processedItems = items.map((item) => {
-      if (item.isHeading) return { ...item, unitRate: 0, gstAmt: 0, cgstAmt: 0, sgstAmt: 0, amount: 0 };
+      if (item.isHeading) return { ...item, unitRate: 0, gstAmt: 0, igstAmt: 0, amount: 0 };
       
       const unitRate = (Number(item.qty) || 0) * (Number(item.rate) || 0); 
       const gstAmt = (unitRate * (Number(item.gstRate) || 0)) / 100;
-      
-      const cgstAmt = gstAmt / 2;
-      const sgstAmt = gstAmt / 2;
 
       const amount = unitRate + gstAmt;
 
       rawTotalTaxable += unitRate;
       totalTaxAmount += gstAmt;
 
-      return { ...item, unitRate, gstAmt, cgstAmt, sgstAmt, amount };
+      return { ...item, unitRate, gstAmt, igstAmt: gstAmt, amount };
     });
 
-    const cgst = totalTaxAmount / 2;
-    const sgst = totalTaxAmount / 2;
+    const igst = totalTaxAmount; // Single IGST tax bucket
 
     const rawGrandTotal = rawTotalTaxable - discount + totalTaxAmount;
     const roundedGrandTotal = Math.round(rawGrandTotal);
@@ -1682,7 +1677,7 @@ export default function App() {
       totalTaxable: rawTotalTaxable,
       totalGstAmount: totalTaxAmount,
       rawTotalAmount: rawTotalTaxable + totalTaxAmount,
-      cgst, sgst, roundOff,
+      igst, roundOff,
       grandTotal: roundedGrandTotal
     };
   }, [items, discount, company.state, customer.state]);
@@ -1747,7 +1742,7 @@ export default function App() {
             
             {hinglishEnabled && (
                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-lg text-sm flex items-center shadow-sm">
-                 <Keyboard className="w-5 h-5 mr-2 flex-shrink-0 text-emerald-600" />
+                 <Keyboard className="w-5 h-5 mr-2 shrink-0 text-emerald-600" />
                  <p><strong>Hinglish Typing is Active:</strong> Type an English word (e.g., <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-100">khana</code>) in Descriptions or Party Name and press <strong>Space</strong> to convert it to Hindi (<code className="bg-white px-1.5 py-0.5 rounded border border-emerald-100">खाना</code>).</p>
                </div>
             )}
@@ -1849,14 +1844,14 @@ export default function App() {
               </div>
               
               <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full text-left border-collapse min-w-[800px]">
+                <table className="w-full text-left border-collapse min-w-200">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 text-sm border-b border-slate-200">
                       <th className="p-3 font-medium w-16 text-center">Type</th>
                       <th className="p-3 font-medium">Description / Heading</th>
                       <th className="p-3 font-medium w-24 text-center">Qnty.</th>
                       <th className="p-3 font-medium w-32 text-right">Rate (₹)</th>
-                      <th className="p-3 font-medium w-24 text-center">GST %</th>
+                      <th className="p-3 font-medium w-24 text-center">IGST %</th>
                       <th className="p-3 font-medium w-36 text-right">Total (₹)</th>
                       <th className="p-3 font-medium w-12 text-center"></th>
                     </tr>
@@ -1928,9 +1923,7 @@ export default function App() {
               <div className="text-indigo-200 text-sm hidden md:flex items-center space-x-4">
                 <span>Taxable: ₹{calculations.totalTaxable.toFixed(2)}</span>
                 <span className="w-px h-4 bg-indigo-700"></span>
-                <span>CGST: ₹{calculations.cgst.toFixed(2)}</span>
-                <span className="w-px h-4 bg-indigo-700"></span>
-                <span>SGST: ₹{calculations.sgst.toFixed(2)}</span>
+                <span>IGST: ₹{calculations.totalGstAmount.toFixed(2)}</span>
                 <span className="w-px h-4 bg-indigo-700"></span>
                 <span>Discount: -₹{discount.toFixed(2)}</span>
                 <span className="w-px h-4 bg-indigo-700"></span>
@@ -2027,8 +2020,8 @@ export default function App() {
                   <th className="p-2 border-x border-slate-200 text-center w-12">{t.qnty}</th>
                   <th className="p-2 border-x border-slate-200 text-right w-16">{t.rate}</th>
                   <th className="p-2 border-x border-slate-200 text-right w-20">{t.unitRate}</th>
-                  <th className="p-2 border-x border-slate-200 text-right w-16">CGST</th>
-                  <th className="p-2 border-x border-slate-200 text-right w-16">SGST</th>
+                  <th className="p-2 border-x border-slate-200 text-right w-20">{t.gst}</th>
+                  <th className="p-2 border-x border-slate-200 text-center w-10">%</th>
                   <th className="p-2 border-x border-slate-200 text-right w-24 font-bold">{t.amount}</th>
                 </tr>
               </thead>
@@ -2043,9 +2036,15 @@ export default function App() {
 
                   if (item.isHeading) {
                     return (
-                      <tr key={item.id} className="bg-slate-50/50">
+                      <tr key={item.id} className="bg-slate-50/50 border-b border-slate-100">
                         <td className="p-2 border-x border-slate-200 text-center"></td>
-                        <td className="p-2 border-x border-slate-200 font-bold text-indigo-900 pt-4 pb-2" colSpan={7}>{item.description}</td>
+                        <td className="p-2 border-x border-slate-200 font-bold text-slate-800 pt-4 pb-2"><span className="underline">{item.description}</span></td>
+                        <td className="p-2 border-x border-slate-200"></td>
+                        <td className="p-2 border-x border-slate-200"></td>
+                        <td className="p-2 border-x border-slate-200"></td>
+                        <td className="p-2 border-x border-slate-200"></td>
+                        <td className="p-2 border-x border-slate-200"></td>
+                        <td className="p-2 border-x border-slate-200"></td>
                       </tr>
                     );
                   }
@@ -2057,13 +2056,9 @@ export default function App() {
                       <td className="p-2 border-x border-slate-200 text-center">{item.qty}</td>
                       <td className="p-2 border-x border-slate-200 text-right">{Number(item.rate).toFixed(2)}</td>
                       <td className="p-2 border-x border-slate-200 text-right">{item.unitRate.toFixed(2)}</td>
-                      <td className="p-2 border-x border-slate-200 text-right text-slate-600">
-                        {item.cgstAmt.toFixed(2)}<br/><span className="text-[10px] text-slate-400">({item.gstRate/2}%)</span>
-                      </td>
-                      <td className="p-2 border-x border-slate-200 text-right text-slate-600">
-                        {item.sgstAmt.toFixed(2)}<br/><span className="text-[10px] text-slate-400">({item.gstRate/2}%)</span>
-                      </td>
-                      <td className="p-2 border-x border-slate-200 text-right font-medium">{item.amount.toFixed(2)}</td>
+                      <td className="p-2 border-x border-slate-200 text-right text-slate-600">{item.gstAmt.toFixed(2)}</td>
+                      <td className="p-2 border-x border-slate-200 text-center text-slate-600">{item.gstRate}</td>
+                      <td className="p-2 border-x border-slate-200 text-right font-medium text-slate-800">{item.amount.toFixed(2)}</td>
                     </tr>
                   );
                 })}
@@ -2103,7 +2098,7 @@ export default function App() {
                </div>
 
                {/* Right: Totals & Signatures */}
-               <div className="w-full md:w-2/5 flex flex-col justify-between h-full min-h-[300px]">
+               <div className="w-full md:w-2/5 flex flex-col justify-between h-full min-h-75">
                   <div className="bg-slate-50 rounded-lg p-5 border border-slate-200">
                     <div className="flex justify-between py-1.5 text-sm border-b border-slate-200">
                       <span className="text-slate-600 font-medium">{t.total}</span>
@@ -2117,12 +2112,8 @@ export default function App() {
                     )}
                     
                     <div className="flex justify-between py-1.5 text-sm border-b border-slate-200">
-                      <span className="text-slate-600 font-medium">CGST Amount</span>
-                      <span className="font-semibold">₹{calculations.cgst.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 text-sm border-b border-slate-200">
-                      <span className="text-slate-600 font-medium">SGST Amount</span>
-                      <span className="font-semibold">₹{calculations.sgst.toFixed(2)}</span>
+                      <span className="text-slate-600 font-medium">IGST Amount</span>
+                      <span className="font-semibold">₹{calculations.igst.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between py-1.5 text-sm border-b border-slate-300">
