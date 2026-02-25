@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Printer, FileText, Settings, Users, Building, List, Languages } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Plus, Trash2, Printer, FileText, Settings, Users, Building, List, Languages, Keyboard } from 'lucide-react';
 
-// Utility for Indian Rupee Number to Words (Fixed for TypeScript Strict Mode)
+// Utility for Indian Rupee Number to Words
 function numberToWordsINR(numInput: number | string) {
   let numStr = numInput.toString();
   if (numStr.length > 9) return 'overflow';
@@ -28,7 +28,6 @@ const STATES = [
   "Jharkhand", "Bihar", "Odisha", "West Bengal", "Chhattisgarh", "Uttar Pradesh", "Maharashtra", "Karnataka", "Delhi", "Others"
 ];
 
-// Language Dictionary for Invoice template
 const TRANSLATIONS = {
   en: {
     billOfSupply: "Bill Of Supply",
@@ -90,7 +89,6 @@ const TRANSLATIONS = {
   }
 };
 
-// Interface defining a line item to resolve TS implicit 'any' warnings
 interface InvoiceItem {
   id: number;
   isHeading: boolean;
@@ -101,9 +99,84 @@ interface InvoiceItem {
   [key: string]: string | number | boolean;
 }
 
+// Special Input Component that converts English letters to Hindi when Space is pressed
+const HinglishInput = ({ value, onChange, enabled, as: Component = 'input', ...props }: any) => {
+  const inputRef = useRef<any>(null);
+  const [internalVal, setInternalVal] = useState(value);
+
+  useEffect(() => {
+    setInternalVal(value);
+  }, [value]);
+
+  const handleChange = (e: any) => {
+    setInternalVal(e.target.value);
+    onChange(e);
+  };
+
+  const handleKeyDown = async (e: any) => {
+    if (!enabled || e.key !== ' ') return;
+
+    const el = e.target;
+    const cursorPos = el.selectionStart;
+    const textBefore = internalVal.slice(0, cursorPos);
+    const textAfter = internalVal.slice(cursorPos);
+    
+    const words = textBefore.split(/[\s\n]+/);
+    const lastWord = words[words.length - 1];
+
+    // Check if the last typed word is entirely English alphabets
+    if (lastWord && /^[a-zA-Z]+$/.test(lastWord)) {
+      e.preventDefault(); // Prevent immediate space
+      try {
+        const res = await fetch(`https://inputtools.google.com/request?text=${lastWord}&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8&app=demopage`);
+        const data = await res.json();
+        
+        if (data && data[0] === 'SUCCESS' && data[1] && data[1][0] && data[1][0][1]) {
+          const hindiWord = data[1][0][1][0];
+          const newTextBefore = textBefore.substring(0, textBefore.length - lastWord.length) + hindiWord + ' ';
+          const newVal = newTextBefore + textAfter;
+          
+          setInternalVal(newVal);
+          onChange({ target: { value: newVal } });
+
+          // Keep the cursor right after the newly inserted Hindi word + space
+          setTimeout(() => {
+            if (inputRef.current) {
+              inputRef.current.selectionStart = newTextBefore.length;
+              inputRef.current.selectionEnd = newTextBefore.length;
+            }
+          }, 10);
+        } else {
+          // Fallback if API returns empty
+          const newVal = textBefore + ' ' + textAfter;
+          setInternalVal(newVal);
+          onChange({ target: { value: newVal } });
+        }
+      } catch (err) {
+        console.error("Transliteration Error:", err);
+        // Fallback on error
+        const newVal = textBefore + ' ' + textAfter;
+        setInternalVal(newVal);
+        onChange({ target: { value: newVal } });
+      }
+    }
+  };
+
+  return (
+    <Component 
+      ref={inputRef}
+      value={internalVal}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      {...props}
+    />
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('edit');
   const [lang, setLang] = useState<'en' | 'hi'>('en');
+  const [hinglishEnabled, setHinglishEnabled] = useState(true); // Default ON
   const t = TRANSLATIONS[lang];
 
   // Company Details (Seller)
@@ -129,7 +202,7 @@ export default function App() {
   const [customer, setCustomer] = useState({
     name: 'District Ayush Medical Officer',
     address: 'West Singhbhum, Chaibasa',
-    state: 'Jharkhand' // Triggers specific conditions
+    state: 'Jharkhand'
   });
 
   // Bank Details
@@ -156,7 +229,6 @@ export default function App() {
 
   const [discount, setDiscount] = useState<number>(0);
 
-  // Handlers with precise typing to fix implicitly 'any' issues
   const handleItemChange = (id: number, field: string, value: string | number) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
@@ -226,10 +298,25 @@ export default function App() {
             <FileText className="w-6 h-6 text-amber-400" />
             <h1 className="text-xl font-bold tracking-wide">Aaradhya Billing Format</h1>
           </div>
-          <div className="flex bg-slate-700 p-1 rounded-lg items-center">
+          <div className="flex bg-slate-700 p-1 rounded-lg items-center flex-wrap gap-2">
+            
+            {/* HINGLISH TOGGLE BUTTON */}
+            <button 
+              onClick={() => setHinglishEnabled(!hinglishEnabled)}
+              className={`px-4 py-2 flex items-center rounded-md transition-colors text-sm font-medium border ${
+                hinglishEnabled 
+                  ? 'bg-green-600 border-green-500 text-white shadow-inner' 
+                  : 'border-slate-500 text-slate-300 hover:bg-slate-600'
+              }`}
+              title="Type in English, press Space to convert to Hindi automatically"
+            >
+              <Keyboard className="w-4 h-4 mr-2" />
+              {hinglishEnabled ? 'Hinglish: ON' : 'Hinglish: OFF'}
+            </button>
+
             <button 
               onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-              className="px-4 py-2 mr-2 flex items-center rounded-md transition-colors text-sm font-medium border border-slate-500 hover:bg-slate-600"
+              className="px-4 py-2 flex items-center rounded-md transition-colors text-sm font-medium border border-slate-500 hover:bg-slate-600"
             >
               <Languages className="w-4 h-4 mr-2" />
               {lang === 'en' ? 'Switch to Hindi' : 'Switch to English'}
@@ -256,6 +343,13 @@ export default function App() {
         {activeTab === 'edit' && (
           <div className="space-y-6 print:hidden">
             
+            {hinglishEnabled && (
+               <div className="bg-green-100 border border-green-300 text-green-800 p-3 rounded-lg text-sm flex items-center">
+                 <Keyboard className="w-5 h-5 mr-2 flex-shrink-0" />
+                 <p><strong>Hinglish Typing is Active:</strong> Click on Party Name, Address, or Item Descriptions. Type an English word (e.g., <code className="bg-white px-1 rounded">khana</code>) and press <strong>Space</strong> to convert it to Hindi (<code className="bg-white px-1 rounded">खाना</code>).</p>
+               </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Company & Invoice Meta */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200">
@@ -282,8 +376,16 @@ export default function App() {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200">
                   <h2 className="text-lg font-bold flex items-center mb-4 border-b pb-2"><Users className="w-5 h-5 mr-2" /> Billed To (Party Details)</h2>
                   <div className="space-y-3">
-                    <div><label className="text-xs text-neutral-500">Party Name</label><input type="text" className="w-full p-2 border rounded" value={customer.name} onChange={e => setCustomer({...customer, name: e.target.value})} /></div>
-                    <div><label className="text-xs text-neutral-500">Address / Description</label><textarea className="w-full p-2 border rounded resize-none" rows={2} value={customer.address} onChange={e => setCustomer({...customer, address: e.target.value})} /></div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Party Name</label>
+                      {/* Uses Hinglish Input */}
+                      <HinglishInput enabled={hinglishEnabled} type="text" className="w-full p-2 border rounded" value={customer.name} onChange={(e: any) => setCustomer({...customer, name: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neutral-500">Address / Description</label>
+                      {/* Uses Hinglish Input Textarea */}
+                      <HinglishInput as="textarea" enabled={hinglishEnabled} className="w-full p-2 border rounded resize-none" rows={2} value={customer.address} onChange={(e: any) => setCustomer({...customer, address: e.target.value})} />
+                    </div>
                     <div>
                       <label className="text-xs text-neutral-500">State (Used for IGST/CGST Logic)</label>
                       <select className="w-full p-2 border rounded" value={customer.state} onChange={e => setCustomer({...customer, state: e.target.value})}>
@@ -342,7 +444,15 @@ export default function App() {
                           </span>
                         </td>
                         <td className="p-2">
-                          <input type="text" placeholder={item.isHeading ? "Enter Heading (e.g. Location - Date)" : "Item description"} className={`w-full p-2 border border-transparent hover:border-slate-300 focus:border-amber-400 rounded outline-none bg-transparent focus:bg-white ${item.isHeading ? 'font-bold text-indigo-900' : ''}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
+                          {/* Uses Hinglish Input Here */}
+                          <HinglishInput 
+                            enabled={hinglishEnabled}
+                            type="text" 
+                            placeholder={item.isHeading ? "Enter Heading (e.g. Location - Date)" : "Item description"} 
+                            className={`w-full p-2 border border-transparent hover:border-slate-300 focus:border-amber-400 rounded outline-none bg-transparent focus:bg-white ${item.isHeading ? 'font-bold text-indigo-900' : ''}`} 
+                            value={item.description} 
+                            onChange={(e: any) => handleItemChange(item.id, 'description', e.target.value)} 
+                          />
                         </td>
                         <td className="p-2">
                           {!item.isHeading && <input type="number" min="1" className="w-full p-2 text-center border border-transparent hover:border-slate-300 focus:border-amber-400 rounded outline-none bg-transparent focus:bg-white" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} />}
