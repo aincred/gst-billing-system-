@@ -19,7 +19,7 @@ export default function Sidebar({ isOpen }: { isOpen: boolean }) {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Monthly Reports', href: '/dashboard/monthly', icon: FileText },
     { name: 'Customers', href: '/dashboard/customers', icon: Users },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    // { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
   const handleLogout = () => {
